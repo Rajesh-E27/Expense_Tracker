@@ -1,6 +1,6 @@
 [
     {
-      "origin": ["https://daytodayexpensetracker.netlify.app/"],
+      "origin": ["http://localhost:5173", "https://daytodayexpensetracker.netlify.app/"],
       "method": ["GET", "POST", "PUT", "DELETE"],
       "maxAgeSeconds": 3600
     }

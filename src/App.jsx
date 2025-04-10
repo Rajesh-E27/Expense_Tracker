@@ -133,7 +133,10 @@ const App = () => {
       const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/send-whatsapp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumber, budget, total }),
+        body: JSON.stringify({
+          phoneNumber,
+          message: `⚠️ Alert! You've used over 90% of your monthly budget ₹${budget}.`,
+        }),
       });
   
       const data = await res.json();
@@ -142,6 +145,7 @@ const App = () => {
       console.error("❌ Error sending WhatsApp alert:", error);
     }
   };
+  
   
 
 

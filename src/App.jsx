@@ -6,6 +6,8 @@ import Chart from './components/Chart';
 import Filter from './components/Filter';
 import MonthlyReportCard from './components/MonthlyReportCard';
 import BudgetWatcher from './components/BudgetWatcher';
+import { Link } from 'react-router-dom';
+
 
 import { getAuth, signOut, onAuthStateChanged } from 'firebase/auth';
 import { db } from './firebase';
@@ -188,9 +190,13 @@ const App = () => {
               </button>
             </div>
           </div>
+
+
+        
+
+
           <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
             <button onClick={exportToCSV} style={buttonStyle}>⬇ Export</button>
-            <button onClick={handleLogout} style={buttonStyle}>🚪 Logout</button>
           </div>
         </div>
 

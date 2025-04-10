@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "expense-tracker-4f447",
+    "firebase storage:rules:set cors.json": "expense-tracker-4f447"
+  },
+  "targets": {},
+  "etags": {}
+}

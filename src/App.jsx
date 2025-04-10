@@ -127,33 +127,70 @@ const App = () => {
   }, []);
 
   const sendWhatsappAlert = async () => {
-    if (!phoneNumber) return;
-
+    console.log("📲 sendWhatsappAlert() called");
+  
     try {
-      await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/send-whatsapp`, {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/send-whatsapp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phoneNumber,
-          message: `⚠️ Alert! You've used over 90% of your monthly budget ₹${budget}.`,
-        }),
+        body: JSON.stringify({ phoneNumber, budget, total }),
       });
-      console.log('✅ WhatsApp alert sent!');
+  
+      const data = await res.json();
+      console.log("✅ WhatsApp Response:", data);
     } catch (error) {
-      console.error('❌ Failed to send WhatsApp alert:', error);
+      console.error("❌ Error sending WhatsApp alert:", error);
     }
   };
+  
+
+
+  // const sendWhatsappAlert = async () => {
+  //   if (!phoneNumber) return;
+
+  //   try {
+  //     await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/send-whatsapp`, {
+  //       method: 'POST',
+  //       headers: { 'Content-Type': 'application/json' },
+  //       body: JSON.stringify({
+  //         phoneNumber,
+  //         message: `⚠️ Alert! You've used over 90% of your monthly budget ₹${budget}.`,
+  //       }),
+  //     });
+  //     console.log('✅ WhatsApp alert sent!');
+  //   } catch (error) {
+  //     console.error('❌ Failed to send WhatsApp alert:', error);
+  //   }
+  // };
+
+  // useEffect(() => {
+  //   if (!alertSent && total >= budget * 0.9 && total < budget * 1.1) {
+  //     sendWhatsappAlert();
+  //     setAlertSent(true);
+  //   }
+
+  //   if (total < budget * 0.9 && alertSent) {
+  //     setAlertSent(false);
+  //   }
+  // }, [total, budget, alertSent, phoneNumber]);
 
   useEffect(() => {
+    console.log("📊 useEffect triggered");
+    console.log("💰 Budget:", budget, "🧾 Total Expenses:", total, "📱 Phone:", phoneNumber);
+    console.log("🔁 alertSent:", alertSent);
+  
     if (!alertSent && total >= budget * 0.9 && total < budget * 1.1) {
+      console.log("🚨 Condition met! Sending WhatsApp alert...");
       sendWhatsappAlert();
       setAlertSent(true);
     }
-
+  
     if (total < budget * 0.9 && alertSent) {
+      console.log("✅ Expenses dropped below 90%, resetting alertSent");
       setAlertSent(false);
     }
   }, [total, budget, alertSent, phoneNumber]);
+  
 
   const addExpense = (expense) => setExpenses((prev) => [expense, ...prev]);
   const deleteExpense = (id) => setExpenses(expenses.filter((e) => e.id !== id));

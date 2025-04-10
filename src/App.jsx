@@ -6,8 +6,10 @@ import Chart from './components/Chart';
 import Filter from './components/Filter';
 import MonthlyReportCard from './components/MonthlyReportCard';
 import { getAuth, signOut } from 'firebase/auth';
+import { db } from './firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from './firebase'; // make sure you import db from firebase.js
+import BudgetWatcher from './components/BudgetWatcher';
+
 
 const themes = {
   light: {
@@ -31,6 +33,8 @@ const themes = {
 };
 
 const App = () => {
+  const auth = getAuth();
+
   const [expenses, setExpenses] = useState(() => {
     const saved = localStorage.getItem('expenses');
     return saved ? JSON.parse(saved) : [];
@@ -46,8 +50,6 @@ const App = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [alertSent, setAlertSent] = useState(false);
 
-  const auth = getAuth();
-
   const filteredExpenses =
     month === 'all'
       ? expenses
@@ -55,17 +57,7 @@ const App = () => {
 
   const total = filteredExpenses.reduce((sum, e) => sum + parseFloat(e.amount), 0);
 
-  const handleLogout = () => {
-    signOut(auth)
-      .then(() => {
-        alert('Successfully logged out!');
-        window.location.href = '/';
-      })
-      .catch((error) => {
-        alert('Logout failed: ' + error.message);
-      });
-  };
-
+  // ✅ Save settings to localStorage
   useEffect(() => {
     localStorage.setItem('expenses', JSON.stringify(expenses));
   }, [expenses]);
@@ -83,77 +75,59 @@ const App = () => {
     }
   }, [theme]);
 
+  // ✅ Recurring expenses
   useEffect(() => {
-    const lastRecurringCheck = localStorage.getItem('lastRecurringCheck');
+    const lastCheck = localStorage.getItem('lastRecurringCheck');
     const today = new Date().toISOString().slice(0, 10);
 
-    if (lastRecurringCheck !== today) {
+    if (lastCheck !== today) {
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
 
-      const newRecurringExpenses = expenses
-        .filter((exp) => exp.isRecurring)
+      const newRecurring = expenses
+        .filter((e) => e.isRecurring)
         .map((exp) => {
-          const existing = expenses.find((e) => {
-            const ed = new Date(e.date);
-            return (
-              e.title === exp.title &&
-              ed.getMonth() === currentMonth &&
-              ed.getFullYear() === currentYear
-            );
+          const alreadyExists = expenses.find((e) => {
+            const d = new Date(e.date);
+            return e.title === exp.title && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
           });
-
-          if (existing) return null;
-
+          if (alreadyExists) return null;
           return {
             ...exp,
             id: Date.now() + Math.random(),
-            date: new Date().toISOString().slice(0, 10),
+            date: today,
           };
         })
         .filter(Boolean);
 
-      if (newRecurringExpenses.length > 0) {
-        setExpenses((prev) => [...newRecurringExpenses, ...prev]);
-      }
+      if (newRecurring.length > 0) setExpenses((prev) => [...newRecurring, ...prev]);
 
       localStorage.setItem('lastRecurringCheck', today);
     }
   }, []);
 
+  // ✅ Get user phone number from Firestore
   useEffect(() => {
-    const user = auth.currentUser;
-    if (user && user.phoneNumber) {
-      setPhoneNumber(user.phoneNumber);
-    }
+    const fetchPhone = async () => {
+      const user = auth.currentUser;
+      if (user) {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          setPhoneNumber(data.phone || '');
+          console.log("📞 Phone number loaded from Firestore:", data.phone);
+        }
+      }
+    };
+    fetchPhone();
   }, []);
 
-
-
-
-useEffect(() => {
-  const fetchPhoneNumber = async () => {
-    const user = auth.currentUser;
-    if (user) {
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        setPhoneNumber(data.phone); // ✅ set the phone from Firestore
-        console.log("📞 Loaded phone number:", data.phone);
-      }
-    }
-  };
-
-  fetchPhoneNumber();
-}, []);
-
-
-
-
+  // ✅ WhatsApp Alert
   const sendWhatsappAlert = async () => {
     console.log("📲 sendWhatsappAlert() called");
     console.log("📤 Sending to phone number:", phoneNumber);
-  
+    if (!phoneNumber) return;
+
     try {
       const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/send-whatsapp`, {
         method: 'POST',
@@ -163,63 +137,40 @@ useEffect(() => {
           message: `⚠️ Alert! You've used over 90% of your monthly budget ₹${budget}.`,
         }),
       });
-  
-      const data = await res.json();
-      console.log("✅ WhatsApp Response:", data);
-    } catch (error) {
-      console.error("❌ Error sending WhatsApp alert:", error);
+
+      const result = await res.json();
+      console.log("✅ WhatsApp Response:", result);
+    } catch (err) {
+      console.error("❌ Error sending WhatsApp alert:", err);
     }
   };
-  
-  
 
-
-  // const sendWhatsappAlert = async () => {
-  //   if (!phoneNumber) return;
-
-  //   try {
-  //     await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/send-whatsapp`, {
-  //       method: 'POST',
-  //       headers: { 'Content-Type': 'application/json' },
-  //       body: JSON.stringify({
-  //         phoneNumber,
-  //         message: `⚠️ Alert! You've used over 90% of your monthly budget ₹${budget}.`,
-  //       }),
-  //     });
-  //     console.log('✅ WhatsApp alert sent!');
-  //   } catch (error) {
-  //     console.error('❌ Failed to send WhatsApp alert:', error);
-  //   }
-  // };
-
-  // useEffect(() => {
-  //   if (!alertSent && total >= budget * 0.9 && total < budget * 1.1) {
-  //     sendWhatsappAlert();
-  //     setAlertSent(true);
-  //   }
-
-  //   if (total < budget * 0.9 && alertSent) {
-  //     setAlertSent(false);
-  //   }
-  // }, [total, budget, alertSent, phoneNumber]);
-
+  // ✅ Trigger alert when budget exceeds 90%
   useEffect(() => {
     console.log("📊 useEffect triggered");
-    console.log("💰 Budget:", budget, "🧾 Total Expenses:", total, "📱 Phone:", phoneNumber);
+    console.log("💰 Budget:", budget, "🧾 Total:", total, "📱 Phone:", phoneNumber);
     console.log("🔁 alertSent:", alertSent);
-  
+
     if (!alertSent && total >= budget * 0.9 && total < budget * 1.1) {
-      console.log("🚨 Condition met! Sending WhatsApp alert...");
+      console.log("🚨 90% Budget reached. Sending alert...");
       sendWhatsappAlert();
       setAlertSent(true);
     }
-  
+
     if (total < budget * 0.9 && alertSent) {
-      console.log("✅ Expenses dropped below 90%, resetting alertSent");
       setAlertSent(false);
+      console.log("✅ Resetting alertSent");
     }
   }, [total, budget, alertSent, phoneNumber]);
-  
+
+  const handleLogout = () => {
+    signOut(auth)
+      .then(() => {
+        alert('Logged out successfully!');
+        window.location.href = '/';
+      })
+      .catch((err) => alert('Logout failed: ' + err.message));
+  };
 
   const addExpense = (expense) => setExpenses((prev) => [expense, ...prev]);
   const deleteExpense = (id) => setExpenses(expenses.filter((e) => e.id !== id));
@@ -236,10 +187,8 @@ useEffect(() => {
       `"${new Date(exp.date).toLocaleDateString()}"`,
       `"${exp.category || 'Uncategorized'}"`,
     ]);
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const content = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
+    const encodedUri = encodeURI(content);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
     link.setAttribute('download', 'expenses.csv');
@@ -275,34 +224,15 @@ useEffect(() => {
       <Header />
 
       <div style={{ padding: '1rem' }}>
-        {/* Top Control Panel */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            marginBottom: '0.75rem',
-          }}
-        >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', flexWrap: 'wrap' }}>
-            {/* Monthly Budget */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <label style={{ fontWeight: 'bold' }}>Monthly Budget:</label>
-              <input
-                type="number"
-                value={budget}
-                onChange={(e) => setBudget(parseFloat(e.target.value))}
-                style={sharedInputStyle}
-              />
+              <input type="number" value={budget} onChange={(e) => setBudget(parseFloat(e.target.value))} style={sharedInputStyle} />
             </div>
-
-            {/* Filter */}
             <div style={{ height: '38px' }}>
               <Filter selectedMonth={month} onMonthChange={setMonth} />
             </div>
-
-            {/* Theme Toggle */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <label style={{ fontWeight: 'bold' }}>Theme:</label>
               <button
@@ -326,55 +256,31 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* Export & Logout */}
           <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
             <button onClick={exportToCSV} style={buttonStyle}>⬇ Export to CSV</button>
             <button onClick={handleLogout} style={buttonStyle}>🚪 Logout</button>
           </div>
         </div>
 
-        {/* Alert Message */}
         {total > budget && (
-          <div
-            style={{
-              color: 'var(--alert-text)',
-              fontWeight: 'bold',
-              backgroundColor: 'var(--alert-bg)',
-              padding: '10px',
-              borderRadius: '6px',
-            }}
-          >
+          <div style={{ color: 'var(--alert-text)', fontWeight: 'bold', backgroundColor: 'var(--alert-bg)', padding: '10px', borderRadius: '6px' }}>
             ⚠ You've exceeded your ₹{budget.toLocaleString()} monthly budget!
           </div>
         )}
       </div>
 
-      {/* Main Layout */}
       <div style={{ display: 'flex', padding: '1rem', gap: '1rem' }}>
         <div style={{ flex: 1 }}>
           <ExpenseForm onAddExpense={addExpense} />
-          <ExpenseList
-            expenses={filteredExpenses}
-            onDelete={deleteExpense}
-            onEdit={editExpense}
-          />
+          <ExpenseList expenses={filteredExpenses} onDelete={deleteExpense} onEdit={editExpense} />
         </div>
-
-        <div
-          style={{
-            flex: 1,
-            background: 'var(--card-bg)',
-            padding: '1rem',
-            borderRadius: '10px',
-            border: '1px solid var(--border-color)',
-          }}
-        >
+        <div style={{ flex: 1, background: 'var(--card-bg)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
           <h2 style={{ textAlign: 'center' }}>Spending Chart</h2>
           <Chart data={filteredExpenses} theme={theme} />
         </div>
       </div>
+      <BudgetWatcher total={total} budget={budget} />
 
-      {/* Monthly Summary */}
       <div style={{ padding: '1rem' }}>
         <MonthlyReportCard expenses={filteredExpenses} budget={budget} />
       </div>

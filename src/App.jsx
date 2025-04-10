@@ -5,11 +5,21 @@ import ExpenseList from './components/ExpenseList';
 import Chart from './components/Chart';
 import Filter from './components/Filter';
 import MonthlyReportCard from './components/MonthlyReportCard';
-import { getAuth, signOut } from 'firebase/auth';
-import { db } from './firebase';
-import { doc, getDoc } from 'firebase/firestore';
 import BudgetWatcher from './components/BudgetWatcher';
 
+import { getAuth, signOut, onAuthStateChanged } from 'firebase/auth';
+import { db } from './firebase';
+import {
+  collection,
+  addDoc,
+  doc,
+  deleteDoc,
+  updateDoc,
+  onSnapshot,
+  query,
+  where,
+  getDoc,
+} from 'firebase/firestore';
 
 const themes = {
   light: {
@@ -35,20 +45,12 @@ const themes = {
 const App = () => {
   const auth = getAuth();
 
-  const [expenses, setExpenses] = useState(() => {
-    const saved = localStorage.getItem('expenses');
-    return saved ? JSON.parse(saved) : [];
-  });
-
+  const [user, setUser] = useState(null);
+  const [expenses, setExpenses] = useState([]);
   const [month, setMonth] = useState('all');
-  const [budget, setBudget] = useState(() => {
-    const savedBudget = localStorage.getItem('budget');
-    return savedBudget ? parseFloat(savedBudget) : 10000;
-  });
-
+  const [budget, setBudget] = useState(() => parseFloat(localStorage.getItem('budget')) || 10000);
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [alertSent, setAlertSent] = useState(false);
 
   const filteredExpenses =
     month === 'all'
@@ -57,126 +59,60 @@ const App = () => {
 
   const total = filteredExpenses.reduce((sum, e) => sum + parseFloat(e.amount), 0);
 
-  // ✅ Save settings to localStorage
-  useEffect(() => {
-    localStorage.setItem('expenses', JSON.stringify(expenses));
-  }, [expenses]);
-
-  useEffect(() => {
-    localStorage.setItem('budget', budget);
-  }, [budget]);
-
+  // 🌟 Theme & Budget Persistence
+  useEffect(() => localStorage.setItem('budget', budget), [budget]);
   useEffect(() => {
     localStorage.setItem('theme', theme);
     const root = document.documentElement;
-    const themeStyles = themes[theme];
-    for (let key in themeStyles) {
-      root.style.setProperty(key, themeStyles[key]);
-    }
+    const vars = themes[theme];
+    for (let key in vars) root.style.setProperty(key, vars[key]);
   }, [theme]);
 
-  // ✅ Recurring expenses
+  // 🌟 Auth Listener & Fetch Phone/Expenses
   useEffect(() => {
-    const lastCheck = localStorage.getItem('lastRecurringCheck');
-    const today = new Date().toISOString().slice(0, 10);
-
-    if (lastCheck !== today) {
-      const currentMonth = new Date().getMonth();
-      const currentYear = new Date().getFullYear();
-
-      const newRecurring = expenses
-        .filter((e) => e.isRecurring)
-        .map((exp) => {
-          const alreadyExists = expenses.find((e) => {
-            const d = new Date(e.date);
-            return e.title === exp.title && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-          });
-          if (alreadyExists) return null;
-          return {
-            ...exp,
-            id: Date.now() + Math.random(),
-            date: today,
-          };
-        })
-        .filter(Boolean);
-
-      if (newRecurring.length > 0) setExpenses((prev) => [...newRecurring, ...prev]);
-
-      localStorage.setItem('lastRecurringCheck', today);
-    }
-  }, []);
-
-  // ✅ Get user phone number from Firestore
-  useEffect(() => {
-    const fetchPhone = async () => {
-      const user = auth.currentUser;
+    const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
+        setUser(user);
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
         if (userDoc.exists()) {
-          const data = userDoc.data();
-          setPhoneNumber(data.phone || '');
-          console.log("📞 Phone number loaded from Firestore:", data.phone);
+          setPhoneNumber(userDoc.data().phone || '');
         }
+
+        const q = query(collection(db, 'users', user.uid, 'expenses'));
+        const unsubSnap = onSnapshot(q, (snapshot) => {
+          const list = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+          setExpenses(list);
+        });
+
+        return () => unsubSnap();
       }
-    };
-    fetchPhone();
+    });
+
+    return () => unsub();
   }, []);
-
-  // ✅ WhatsApp Alert
-  const sendWhatsappAlert = async () => {
-    console.log("📲 sendWhatsappAlert() called");
-    console.log("📤 Sending to phone number:", phoneNumber);
-    if (!phoneNumber) return;
-
-    try {
-      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/send-whatsapp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phoneNumber,
-          message: `⚠️ Alert! You've used over 90% of your monthly budget ₹${budget}.`,
-        }),
-      });
-
-      const result = await res.json();
-      console.log("✅ WhatsApp Response:", result);
-    } catch (err) {
-      console.error("❌ Error sending WhatsApp alert:", err);
-    }
-  };
-
-  // ✅ Trigger alert when budget exceeds 90%
-  useEffect(() => {
-    console.log("📊 useEffect triggered");
-    console.log("💰 Budget:", budget, "🧾 Total:", total, "📱 Phone:", phoneNumber);
-    console.log("🔁 alertSent:", alertSent);
-
-    if (!alertSent && total >= budget * 0.9 && total < budget * 1.1) {
-      console.log("🚨 90% Budget reached. Sending alert...");
-      sendWhatsappAlert();
-      setAlertSent(true);
-    }
-
-    if (total < budget * 0.9 && alertSent) {
-      setAlertSent(false);
-      console.log("✅ Resetting alertSent");
-    }
-  }, [total, budget, alertSent, phoneNumber]);
 
   const handleLogout = () => {
-    signOut(auth)
-      .then(() => {
-        alert('Logged out successfully!');
-        window.location.href = '/';
-      })
-      .catch((err) => alert('Logout failed: ' + err.message));
+    signOut(auth).then(() => {
+      alert('Logged out!');
+      window.location.href = '/';
+    });
   };
 
-  const addExpense = (expense) => setExpenses((prev) => [expense, ...prev]);
-  const deleteExpense = (id) => setExpenses(expenses.filter((e) => e.id !== id));
-  const editExpense = (updated) => {
-    const updatedList = expenses.map((e) => (e.id === updated.id ? updated : e));
-    setExpenses(updatedList);
+  // 🌟 Firestore Handlers
+  const addExpense = async (expense) => {
+    if (!user) return;
+    await addDoc(collection(db, 'users', user.uid, 'expenses'), expense);
+  };
+
+  const deleteExpense = async (id) => {
+    if (!user) return;
+    await deleteDoc(doc(db, 'users', user.uid, 'expenses', id));
+  };
+
+  const editExpense = async (expense) => {
+    if (!user) return;
+    const { id, ...rest } = expense;
+    await updateDoc(doc(db, 'users', user.uid, 'expenses', id), rest);
   };
 
   const exportToCSV = () => {
@@ -187,11 +123,12 @@ const App = () => {
       `"${new Date(exp.date).toLocaleDateString()}"`,
       `"${exp.category || 'Uncategorized'}"`,
     ]);
-    const content = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
-    const encodedUri = encodeURI(content);
+    const content =
+      'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'expenses.csv');
+    link.href = encodeURI(content);
+    link.download = 'expenses.csv';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -224,7 +161,7 @@ const App = () => {
       <Header />
 
       <div style={{ padding: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <label style={{ fontWeight: 'bold' }}>Monthly Budget:</label>
@@ -245,25 +182,26 @@ const App = () => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  transform: theme === 'dark' ? 'scale(1.05)' : 'scale(1)',
-                  boxShadow: theme === 'dark'
-                    ? '0 4px 12px rgba(187, 134, 252, 0.4)'
-                    : '0 4px 12px rgba(0, 123, 255, 0.3)',
                 }}
               >
                 {theme === 'light' ? '🌙 Dark Mode' : '☀️ Light Mode'}
               </button>
             </div>
           </div>
-
           <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-            <button onClick={exportToCSV} style={buttonStyle}>⬇ Export to CSV</button>
+            <button onClick={exportToCSV} style={buttonStyle}>⬇ Export</button>
             <button onClick={handleLogout} style={buttonStyle}>🚪 Logout</button>
           </div>
         </div>
 
         {total > budget && (
-          <div style={{ color: 'var(--alert-text)', fontWeight: 'bold', backgroundColor: 'var(--alert-bg)', padding: '10px', borderRadius: '6px' }}>
+          <div style={{
+            color: 'var(--alert-text)',
+            fontWeight: 'bold',
+            backgroundColor: 'var(--alert-bg)',
+            padding: '10px',
+            borderRadius: '6px'
+          }}>
             ⚠ You've exceeded your ₹{budget.toLocaleString()} monthly budget!
           </div>
         )}
@@ -279,7 +217,8 @@ const App = () => {
           <Chart data={filteredExpenses} theme={theme} />
         </div>
       </div>
-      <BudgetWatcher total={total} budget={budget} />
+
+      <BudgetWatcher total={total} budget={budget} phoneNumber={phoneNumber} />
 
       <div style={{ padding: '1rem' }}>
         <MonthlyReportCard expenses={filteredExpenses} budget={budget} />

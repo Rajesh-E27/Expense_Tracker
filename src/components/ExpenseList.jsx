@@ -6,7 +6,10 @@ const ExpenseList = ({ expenses, onDelete, onEdit }) => {
 
   const handleEditClick = (expense) => {
     setEditId(expense.id);
-    setEditData(expense);
+    setEditData({
+      ...expense,
+      date: new Date(expense.date).toISOString().split('T')[0], // format for input[type=date]
+    });
   };
 
   const handleChange = (e) => {
@@ -18,8 +21,10 @@ const ExpenseList = ({ expenses, onDelete, onEdit }) => {
   };
 
   const handleSave = () => {
-    onEdit(editData);
-    setEditId(null);
+    if (editData.title && editData.amount && editData.date) {
+      onEdit({ ...editData });
+      setEditId(null);
+    }
   };
 
   return (
@@ -55,7 +60,11 @@ const ExpenseList = ({ expenses, onDelete, onEdit }) => {
                     name="title"
                     value={editData.title}
                     onChange={handleChange}
-                    style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-color)', border: '1px solid var(--border-color)' }}
+                    style={{
+                      backgroundColor: 'var(--input-bg)',
+                      color: 'var(--text-color)',
+                      border: '1px solid var(--border-color)',
+                    }}
                   />
                 ) : (
                   expense.title
@@ -68,7 +77,11 @@ const ExpenseList = ({ expenses, onDelete, onEdit }) => {
                     name="amount"
                     value={editData.amount}
                     onChange={handleChange}
-                    style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-color)', border: '1px solid var(--border-color)' }}
+                    style={{
+                      backgroundColor: 'var(--input-bg)',
+                      color: 'var(--text-color)',
+                      border: '1px solid var(--border-color)',
+                    }}
                   />
                 ) : (
                   `₹ ${expense.amount}`
@@ -81,7 +94,11 @@ const ExpenseList = ({ expenses, onDelete, onEdit }) => {
                     name="date"
                     value={editData.date}
                     onChange={handleChange}
-                    style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-color)', border: '1px solid var(--border-color)' }}
+                    style={{
+                      backgroundColor: 'var(--input-bg)',
+                      color: 'var(--text-color)',
+                      border: '1px solid var(--border-color)',
+                    }}
                   />
                 ) : (
                   new Date(expense.date).toLocaleDateString()

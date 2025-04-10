@@ -6,6 +6,8 @@ import Chart from './components/Chart';
 import Filter from './components/Filter';
 import MonthlyReportCard from './components/MonthlyReportCard';
 import { getAuth, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from './firebase'; // make sure you import db from firebase.js
 
 const themes = {
   light: {
@@ -126,8 +128,31 @@ const App = () => {
     }
   }, []);
 
+
+
+
+useEffect(() => {
+  const fetchPhoneNumber = async () => {
+    const user = auth.currentUser;
+    if (user) {
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        setPhoneNumber(data.phone); // ✅ set the phone from Firestore
+        console.log("📞 Loaded phone number:", data.phone);
+      }
+    }
+  };
+
+  fetchPhoneNumber();
+}, []);
+
+
+
+
   const sendWhatsappAlert = async () => {
     console.log("📲 sendWhatsappAlert() called");
+    console.log("📤 Sending to phone number:", phoneNumber);
   
     try {
       const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/send-whatsapp`, {

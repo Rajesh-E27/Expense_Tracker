@@ -6,9 +6,6 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 const fromWhatsapp = process.env.TWILIO_WHATSAPP_FROM;
 
 const client = require('twilio')(accountSid, authToken);
-if (!phoneNumber) {
-  throw new Error("Phone number not found for this user.");
-}
 
 const sendWhatsappMessage = async (to, body) => {
   console.log("📤 Sending WhatsApp message to:", to);

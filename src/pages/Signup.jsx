@@ -6,6 +6,7 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import "./Auth.css";
 
 const Signup = () => {
+  const [name, setName] = useState(""); // 🆕 Name state
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -25,8 +26,9 @@ const Signup = () => {
       const userCred = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCred.user;
 
-      // ✅ Save email, phone, createdAt to Firestore
+      // ✅ Save name, email, phone, createdAt to Firestore
       await setDoc(doc(db, "users", user.uid), {
+        name,
         email,
         phone,
         createdAt: serverTimestamp()
@@ -44,6 +46,14 @@ const Signup = () => {
         <h2>Create an Account</h2>
 
         {error && <p className="auth-error">{error}</p>}
+
+        <input
+          type="text"
+          placeholder="Full Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
 
         <input
           type="email"

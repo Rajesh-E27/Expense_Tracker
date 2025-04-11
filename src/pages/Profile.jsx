@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getAuth } from 'firebase/auth';
 import { db } from '../firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 
 const Profile = () => {
   const auth = getAuth();
@@ -12,84 +12,81 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
+    const fetchUserData = async () => {
       if (user) {
         try {
-          const userDocRef = doc(db, 'users', user.uid);
-          const docSnap = await getDoc(userDocRef);
+          const docRef = doc(db, 'users', user.uid);
+          const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
             const data = docSnap.data();
-            setName(data.name || '');
-            setPhone(data.phone || '');
+            setName(data.name || 'Unknown User');
+            setPhone(data.phone || 'Not Provided');
           }
-        } catch (error) {
-          console.error("❌ Error fetching user profile:", error);
+        } catch (err) {
+          console.error('❌ Error fetching profile:', err);
         } finally {
           setLoading(false);
         }
       }
     };
-
-    fetchUserProfile();
+    fetchUserData();
   }, [user]);
 
-  const handleUpdate = async (e) => {
-    e.preventDefault();
-    if (!user) return;
-
-    try {
-      const userDocRef = doc(db, 'users', user.uid);
-      await updateDoc(userDocRef, { name, phone });
-      alert('✅ Profile updated successfully!');
-    } catch (error) {
-      console.error("❌ Error updating profile:", error);
-      alert('Failed to update profile.');
-    }
-  };
-
-  if (loading) return <p style={{ textAlign: 'center' }}>Loading profile...</p>;
+  if (loading) {
+    return <p style={{ textAlign: 'center', marginTop: '2rem', color: '#555' }}>Loading profile...</p>;
+  }
 
   return (
-    <div style={{ maxWidth: '400px', margin: '2rem auto', padding: '1.5rem', border: '1px solid #ccc', borderRadius: '10px' }}>
-      <h2 style={{ marginBottom: '1rem' }}>User Profile</h2>
-      <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Full Name"
-          required
-          style={inputStyle}
-        />
-        <input
-          type="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="Phone Number"
-          required
-          style={inputStyle}
-        />
-        <button type="submit" style={buttonStyle}>Update Profile</button>
-      </form>
+    <div style={cardStyle}>
+      <div style={avatarStyle}>{name ? name.charAt(0).toUpperCase() : '👤'}</div>
+      <h2 style={nameStyle}>{name}</h2>
+      <p style={emailStyle}>{user?.email}</p>
+      <p style={phoneStyle}>📞 {phone}</p>
     </div>
   );
 };
 
-const inputStyle = {
-  padding: '10px',
-  fontSize: '16px',
-  borderRadius: '6px',
-  border: '1px solid #ccc',
+const cardStyle = {
+  maxWidth: '360px',
+  margin: '4rem auto',
+  padding: '2rem',
+  background: 'rgba(255, 255, 255, 0.1)',
+  backdropFilter: 'blur(12px)',
+  borderRadius: '20px',
+  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+  color: '#fff',
+  textAlign: 'center',
+  border: '1px solid rgba(255, 255, 255, 0.2)',
 };
 
-const buttonStyle = {
-  padding: '10px',
-  fontSize: '16px',
-  backgroundColor: '#007bff',
+const avatarStyle = {
+  width: '70px',
+  height: '70px',
+  margin: '0 auto 1rem',
+  borderRadius: '50%',
+  backgroundColor: '#ffffff33',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: '28px',
+  fontWeight: 'bold',
   color: '#fff',
-  border: 'none',
-  borderRadius: '6px',
-  cursor: 'pointer',
+};
+
+const nameStyle = {
+  fontSize: '24px',
+  marginBottom: '0.25rem',
+};
+
+const emailStyle = {
+  fontSize: '14px',
+  opacity: 0.8,
+  marginBottom: '0.25rem',
+};
+
+const phoneStyle = {
+  fontSize: '14px',
+  opacity: 0.8,
 };
 
 export default Profile;

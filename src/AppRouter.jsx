@@ -3,12 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import App from './App';
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
-import { auth } from "./firebase";
-import { onAuthStateChanged } from "firebase/auth";
 import ForgotPassword from './pages/ForgotPassword';
 import Profile from './pages/Profile';
-
-
+import { auth } from "./firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 const AppRouter = () => {
   const [user, setUser] = useState(null);
@@ -39,7 +37,6 @@ const AppRouter = () => {
         <Route path="/" element={user ? <App /> : <Navigate to="/login" />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/profile" element={<Profile />} />
-
       </Routes>
     </Router>
   );

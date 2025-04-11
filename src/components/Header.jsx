@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { getAuth, signOut } from "firebase/auth";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db, storage } from "../firebase";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, getDownloadURL } from "firebase/storage";
 import { FaUserCircle } from "react-icons/fa";
 
 const Header = () => {
@@ -10,9 +10,7 @@ const Header = () => {
   const user = auth.currentUser;
   const [showCard, setShowCard] = useState(false);
   const [userData, setUserData] = useState({});
-  const [newName, setNewName] = useState("");
   const [profileImgUrl, setProfileImgUrl] = useState("");
-  const fileInputRef = useRef();
   const cardRef = useRef();
 
   const handleLogout = async () => {
@@ -25,17 +23,14 @@ const Header = () => {
       const docRef = doc(db, "users", user.uid);
       const snap = await getDoc(docRef);
       if (snap.exists()) {
-        const data = snap.data();
-        setUserData(data);
-        setNewName(data.name || "");
+        setUserData(snap.data());
       }
       try {
         const imageRef = ref(storage, `profileImages/${user.uid}.jpg`);
         const url = await getDownloadURL(imageRef);
         setProfileImgUrl(url);
       } catch (e) {
-        // No profile image yet
-        setProfileImgUrl("");
+        setProfileImgUrl(""); // no image
       }
     }
   };
@@ -53,23 +48,6 @@ const Header = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const imageRef = ref(storage, `profileImages/${user.uid}.jpg`);
-    await uploadBytes(imageRef, file);
-    const url = await getDownloadURL(imageRef);
-    setProfileImgUrl(url);
-  };
-
-  const handleNameSave = async () => {
-    const docRef = doc(db, "users", user.uid);
-    await updateDoc(docRef, { name: newName });
-    alert("✅ Name updated!");
-    setUserData((prev) => ({ ...prev, name: newName }));
-  };
 
   return (
     <header style={{
@@ -105,7 +83,7 @@ const Header = () => {
             zIndex: 999,
             animation: "fadeIn 0.3s ease-out",
           }}>
-            <div style={{ textAlign: "center", marginBottom: "0.5rem" }}>
+            <div style={{ textAlign: "center", marginBottom: "1rem" }}>
               {profileImgUrl ? (
                 <img
                   src={profileImgUrl}
@@ -115,53 +93,11 @@ const Header = () => {
               ) : (
                 <FaUserCircle size={64} color="#ccc" />
               )}
-              <br />
-              <input
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                ref={fileInputRef}
-                onChange={handleImageUpload}
-              />
-              <button
-                style={{ marginTop: "5px", fontSize: "12px" }}
-                onClick={() => fileInputRef.current.click()}
-              >
-                📷 Upload
-              </button>
-            </div>
-
-            <div>
-              <input
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "6px",
-                  border: "1px solid #ccc",
-                  borderRadius: "6px",
-                  marginBottom: "0.5rem",
-                }}
-              />
-              <button
-                onClick={handleNameSave}
-                style={{
-                  backgroundColor: "#28a745",
-                  color: "white",
-                  border: "none",
-                  padding: "6px 12px",
-                  borderRadius: "6px",
-                  width: "100%",
-                  marginBottom: "0.5rem",
-                }}
-              >
-                💾 Save Name
-              </button>
+              <p style={{ marginTop: "0.5rem", fontWeight: "bold" }}>{userData.name || "No name"}</p>
             </div>
 
             <p style={{ fontSize: "0.85rem", marginBottom: "0.25rem" }}><strong>Email:</strong> {user?.email}</p>
-            <p style={{ fontSize: "0.85rem", marginBottom: "0.5rem" }}><strong>Phone:</strong> {userData.phone || "—"}</p>
+            <p style={{ fontSize: "0.85rem", marginBottom: "1rem" }}><strong>Phone:</strong> {userData.phone || "—"}</p>
 
             <button
               onClick={handleLogout}

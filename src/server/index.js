@@ -6,7 +6,7 @@ const app = express();
 
 // ✅ Enable CORS for localhost and your deployed frontend (if any)
 app.use(cors({
-  origin: ['http://localhost:5173', 'https://your-frontend-url.com'], // Replace with your actual frontend domain if deployed
+  origin: ['http://localhost:5173', 'https://daytodayexpensetracker.netlify.app/'], // Replace with your actual frontend domain if deployed
   methods: ['GET', 'POST'],
   credentials: true
 }));
